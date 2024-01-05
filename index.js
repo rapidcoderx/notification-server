@@ -22,7 +22,6 @@ app.use(bodyParser.json());
 const initCache = () => {
     const options = {
         max: 500,
-        maxSize: 5000,
         ttl: 1000 * 60 * 15,
         allowStale: false,
         updateAgeOnGet: false,
@@ -70,18 +69,27 @@ const storeDataInCache = (key, data) => {
     cache.set(key, {data: data, timestamp: Date.now()});
 }
 
-app.post('/data', (req, res) => {
+app.post('/api/data', (req, res) => {
     currentDataKey++;
     storeDataInCache(currentDataKey, req.body);
     res.status(201).json({message: 'Data has been stored successfully'});
 });
 
-app.get('/data', (req, res) => {
+app.get('/api/data', (req, res) => {
     let values = [];
     cache.forEach((val) => {
         values.push(val);
     });
-    res.json(sortByTimestamp(values).map(val => val.data));
+    res.json(sortByTimestamp(values).map(val => {
+        const {luwId, type, subject, businessDate} = val.data;
+        return {
+            luwId,
+            type,
+            subject,
+            businessDate,
+            timestamp: val.timestamp
+        };
+    }));
 });
 
 /**
