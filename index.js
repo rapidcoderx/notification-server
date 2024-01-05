@@ -1,24 +1,12 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const {LRUCache} = require('lru-cache');
+const path = require('path');
 require('dotenv').config();
 
-/**
- * Creates an instance of the Express application.
- *
- * @returns {object} The Express application object.
- *
- * @example
- * const app = express();
- */
 const app = express();
 app.use(bodyParser.json());
 
-/**
- * Initializes a new LRUCache with default options.
- *
- * @returns {LRUCache} The initialized LRUCache instance.
- */
 const initCache = () => {
     const options = {
         max: 500,
@@ -26,82 +14,68 @@ const initCache = () => {
         allowStale: false,
         updateAgeOnGet: false,
         updateAgeOnHas: false,
-    }
+    };
+
     return new LRUCache(options);
-}
+};
 
-/**
- * Initializes a cache.
- *
- * @returns {Object} The initialized cache object.
- */
 const cache = initCache();
-/**
- * Represents the current data key.
- *
- * @type {number}
- * @name currentDataKey
- * @description This variable stores the current data key value.
- */
-let currentDataKey = 0;
+let currentDataKey = 1;
 
-/**
- * Sorts an array of objects by the 'timestamp' property in descending order.
- *
- * @param {Array} values - The array of objects to be sorted.
- * @return {Array} - The sorted array of objects.
- */
-const sortByTimestamp = (values) => {
-    values.sort((a, b) => {
-        return b['timestamp'] - a['timestamp'];
-    });
-    return values;
-}
+const sortByTimestamp = (values) => Array.isArray(values) ? values.sort((a, b) => b['timestamp'] - a['timestamp']) : [];
 
-/**
- * Store data in cache.
- *
- * @param {string|number} key - The key to identify the data in the cache.
- * @param {*} data - The data to be stored in the cache.
- * @returns {void}
- */
 const storeDataInCache = (key, data) => {
     cache.set(key, {data: data, timestamp: Date.now()});
-}
+};
+
+const pad = (number) => {
+    return number < 10 ? '0' + number : number;
+};
+
+const getLocalTimestamp = (timestamp) => {
+    const date = new Date(timestamp);
+    return date.getFullYear() +
+        '-' + pad(date.getMonth() + 1) +
+        '-' + pad(date.getDate()) +
+        'T' + pad(date.getHours()) +
+        ':' + pad(date.getMinutes()) +
+        ':' + pad(date.getSeconds()) +
+        '.' + (date.getMilliseconds() / 1000).toFixed(3).slice(2, 5);
+};
+
+const mapValuesWithTimestamp = (value, key) => {
+    const {luwId, type, subject, businessDate} = value.data;
+    return {
+        luwId,
+        type,
+        subject,
+        businessDate,
+        timestamp: getLocalTimestamp(value.timestamp),
+        key: key
+    };
+};
 
 app.post('/api/data', (req, res) => {
-    currentDataKey++;
-    storeDataInCache(currentDataKey, req.body);
-    res.status(201).json({message: 'Data has been stored successfully'});
+    Object.assign(req.body, {key: currentDataKey++});
+    storeDataInCache(req.body.key.toString(), req.body);
+    res.status(201).json({message: 'Data stored successfully'});
 });
+
+app.set('view engine', 'pug');
+app.set('views', path.join(__dirname, 'views'));
 
 app.get('/api/data', (req, res) => {
-    let values = [];
-    cache.forEach((val) => {
-        values.push(val);
-    });
-    res.json(sortByTimestamp(values).map(val => {
-        const {luwId, type, subject, businessDate} = val.data;
-        return {
-            luwId,
-            type,
-            subject,
-            businessDate,
-            timestamp: val.timestamp
-        };
-    }));
+    let keys = Array.from(cache.keys());
+    let values = Array.from(cache.values()).map((value, index) => mapValuesWithTimestamp(value, keys[index]));
+    res.json(sortByTimestamp(values));
 });
 
-/**
- * The PORT variable represents the port number on which the application will listen.
- * If the process.env.PORT environment variable is defined, PORT will be set to its value.
- * Otherwise, PORT will default to 3000.
- *
- * @type {number}
- *
- * @example
- * // Set PORT to 8080 if process.env.PORT is defined, otherwise set it to 3000.
- * const PORT = process.env.PORT || 3000;
- */
+app.get('/api/view', (req, res) => {
+    let keys = Array.from(cache.keys());
+    let values = Array.from(cache.values()).map((value, index) => mapValuesWithTimestamp(value, keys[index]));
+    let sortedValues = sortByTimestamp(values);
+    res.render('data', {values: sortedValues.slice(-15)});
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server started at port ${PORT}`));

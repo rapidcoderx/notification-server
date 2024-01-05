@@ -1,0 +1,36 @@
+doctype html
+html
+    head
+        title Data View
+        link(rel="stylesheet", href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css")
+    body
+        .container-fluid.mt-3
+            table.table.table-striped(style="width: 100%; margin: 0;padding: 0;")#dataTable.table-hover
+                thead.thead-dark
+                    tr
+                        th(scope="col") LUW ID
+                        th(scope="col") Type
+                        th(scope="col") Subject
+                        th(scope="col") Business Date
+                        th(scope="col") Timestamp
+                        th(scope="col") Key
+                tbody#tableBody
+        script.
+            async function fetchData() {
+                const response = await fetch('/api/data');
+                const data = await response.json();
+                const tableBody = document.getElementById('tableBody');
+                tableBody.innerHTML = '';
+                data.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML =
+                        `<td>${item.luwId}</td>
+                         <td>${item.type}</td>
+                         <td>${item.subject}</td>
+                         <td>${item.businessDate}</td>
+                         <td>${item.timestamp}</td>
+                         <td>${item.key}</td>`;
+                    tableBody.appendChild(row);
+                });
+            }
+            setInterval(fetchData, 3000);
