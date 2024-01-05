@@ -1,0 +1,30 @@
+# Node.js related files
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Project related
+.env
+.DS_Store
+
+# IDE related
+.settings
+.idea
+*.iml
+.vscode
+
+# Operating System related
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+__MACOSX
+
+# dist directory
+dist
