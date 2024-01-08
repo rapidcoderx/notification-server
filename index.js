@@ -71,6 +71,7 @@ const publishToRabbitMQ = (channel, exchangeName, topicName, bufferContent) => {
 };
 
 const publishMessage = async (req, res) => {
+
     const bufferContent = Buffer.from(JSON.stringify(req.body));
 
     const executeAndMeasureTime = () => {
@@ -102,7 +103,7 @@ const initLRUCache = () => {
 
 const cache = initLRUCache();
 let currentDataKey = 1;
-const topicCache = initLRUCache();
+
 const sortByTimestamp = (values) => Array.isArray(values) ? values.sort((a, b) => b['timestamp'] - a['timestamp']) : [];
 
 const consumeFromRabbitMQ = async () => {
@@ -110,8 +111,9 @@ const consumeFromRabbitMQ = async () => {
     let queue = await channel.assertQueue('', {exclusive: true});
     channel.bindQueue(queue.queue, exchangeName, topicName);
     channel.consume(queue.queue, (data) => {
-        const message = JSON.parse(data.content);
-        storeDataInCache(topicCache, currentDataKey++, message);
+        let message = JSON.parse(data.content);
+        Object.assign(message, { key: currentDataKey++ });
+        storeDataInCache(message.key.toString(), message);
         channel.ack(data);
     }, {noAck: false});
 };
@@ -147,35 +149,16 @@ const mapValuesWithTimestamp = (value, key) => {
     };
 };
 
+
+app.set('view engine', 'pug');
+app.set('views', path.join(__dirname, 'views'));
+app.post('/api/publish', publishMessage);
+
 app.post('/api/data', (req, res) => {
     Object.assign(req.body, {key: currentDataKey++});
     storeDataInCache(req.body.key.toString(), req.body);
     res.status(201).json({message: 'Data stored successfully'});
 });
-
-app.post('/api/topicData', (req, res) => {
-    Object.assign(req.body, {key: currentDataKey++});
-    storeDataInCache(topicCache, req.body.key.toString(), req.body);
-    res.status(201).json({message: 'Data stored successfully'});
-});
-
-app.get('/api/topicData', (req, res) => {
-    let cacheKeys = Array.from(topicCache.keys());
-    let mappedValues = Array.from(topicCache.values()).map((value, index) => mapValuesWithTimestamp(value, cacheKeys[index]));
-    res.json(sortByTimestamp(mappedValues));
-});
-
-app.get('/api/topicView', (req, res) => {
-    let cacheKeys = Array.from(topicCache.keys());
-    let mappedValues = Array.from(topicCache.values()).map((value, index) => mapValuesWithTimestamp(value, cacheKeys[index]));
-    let sortedValues = sortByTimestamp(mappedValues);
-    res.render('data', {values: sortedValues.slice(-15)});
-});
-
-app.post('/publish', publishMessage);
-
-app.set('view engine', 'pug');
-app.set('views', path.join(__dirname, 'views'));
 
 app.get('/api/data', (req, res) => {
     let cacheKeys = Array.from(cache.keys());
