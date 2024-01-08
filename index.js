@@ -113,6 +113,7 @@ const consumeFromRabbitMQ = async () => {
     channel.consume(queue.queue, (data) => {
         let message = JSON.parse(data.content);
         Object.assign(message, { key: currentDataKey++ });
+        console.log("Received message:"+message.key.toString());
         storeDataInCache(message.key.toString(), message);
         channel.ack(data);
     }, {noAck: false});
